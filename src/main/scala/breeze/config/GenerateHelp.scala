@@ -51,7 +51,7 @@ object GenerateHelp {
         val myAnns = anns(i)
         val tpe = typedParams(i)
         val name = paramNames(i)
-        val default = try { defaults(i)().toString } catch { case e: Exception => ""}
+        val default =  defaults(i).map(_.toString).getOrElse("")
         val ann = myAnns.collectFirst{case h: Help => h}
         ann match {
           case None if isPrimitive(tpe.runtimeClass) =>
@@ -83,6 +83,7 @@ object GenerateHelp {
 
     buf.toString
   }
+
 
   private trait Format {
     def paramLength: Int = 0

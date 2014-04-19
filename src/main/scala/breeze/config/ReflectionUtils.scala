@@ -2,6 +2,7 @@ package breeze.config
 
 import java.{lang=>jl}
 import jl.reflect._
+import scala.util.{Failure, Try}
 
 /**
  * Various utilities for determining properties of an object given Manifests and Class information
@@ -29,36 +30,30 @@ private[config] object ReflectionUtils {
    *
    * Super hacky.
    */
-  def lookupDefaultValues(clazz: Class[_], paramNames: Seq[String]): Seq[() => AnyRef] = {
+  def lookupDefaultValues(clazz: Class[_], paramNames: Seq[String]): Seq[Try[AnyRef]] = {
     try {
       val companion = Class.forName(clazz.getName() + "$").getField("MODULE$").get(null)
       // defaults have the form  init$default$X, for X = 1...
-      paramNames.zipWithIndex.map{
-        case (name, idx) => () =>
-          try {
+      paramNames.zipWithIndex.map { case (name, idx) =>
+          Try {
             val method = companion.getClass.getMethod("init$default$" + (idx + 1))
             method.invoke(companion)
-          } catch {
-            case e: java.lang.NoSuchMethodException =>
-              try {
+          }.recoverWith {
+            case e: NoSuchMethodException =>
+              Try {
                 val method = companion.getClass.getMethod("$lessinit$greater$default$" + (idx + 1))
                 method.invoke(companion)
-              } catch {
-                case e: java.lang.NoSuchMethodException =>
-                throw new NoParameterException("Could not find a matching property!", name)
-                case e: Exception =>
-                  throw new RuntimeException("Problem processing default argument for " + name, e)
               }
+          }.recoverWith {
+            case e: NoSuchMethodException =>
+               Failure(new NoParameterException("Could not find a matching property (no default value)!", name))
             case e: Exception =>
-              throw new RuntimeException("Problem processing default argument for " + name, e)
+              Failure(new RuntimeException("Problem processing default argument for " + name, e))
           }
-
       }
     } catch {
-      case e: Exception =>
-        paramNames.map{
-          paramName => () => throw new NoParameterException("Could not find a matching property!", paramName)
-        }
+      case ex: ClassNotFoundException =>
+        paramNames.map(n => Failure(new NoParameterException("No default and no parameter!", n)))
     }
   }
 
