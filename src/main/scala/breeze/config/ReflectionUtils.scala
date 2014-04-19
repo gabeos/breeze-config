@@ -64,13 +64,12 @@ private[config] object ReflectionUtils {
   def solveTypes(knownTypes: Map[String, OptManifest[_]], staticClass: Class[_], dynamicClass: Class[_]): Map[String, OptManifest[_]] = {
     if (!staticClass.isAssignableFrom(dynamicClass)) throw new RuntimeException(staticClass  + " is not assignable from " + dynamicClass + "!")
     // iterate up the inheritance chain
-    def superTypes = if (dynamicClass.isInterface) (
+    def superTypes = if (dynamicClass.isInterface) {
       dynamicClass.getInterfaces.iterator
-      )
-    else /* class*/ (
+    } else /* class*/ {
       Iterator.iterate(dynamicClass.asInstanceOf[Class[AnyRef]])(_.getSuperclass.asInstanceOf[Class[AnyRef]])
         .takeWhile(clss => clss != null && staticClass.isAssignableFrom(clss))
-      )
+    }
     val highestType = superTypes.reduceLeft((a, b) => b)
     val dynamicToStaticMapping: Map[String, OptManifest[_]] = superTypes.sliding(2, 1).foldRight(knownTypes) {
       (classPair, knownTypes) =>
