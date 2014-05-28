@@ -1,10 +1,12 @@
 name := "breeze-config"
 
-version := "0.8-SNAPSHOT"
+version := "0.8"
 
 organization := "org.scalanlp"
 
 scalaVersion := "2.10.3"
+
+crossScalaVersions  := Seq("2.11.1", "2.10.3")
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
