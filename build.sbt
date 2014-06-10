@@ -15,22 +15,11 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
+  "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
+  "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "junit" % "junit" % "4.5" % "test",
   "com.thoughtworks.paranamer" % "paranamer" % "2.2"
 )
-
-libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
-  sv match {
-    case "2.9.2" =>
-      (deps :+ ("org.scalatest" % "scalatest" % "1.4.RC2" % "test"))
-    case x if x.startsWith("2.8") =>
-      (deps :+ ("org.scalatest" % "scalatest" % "1.3" % "test")
-            :+ ("org.scala-tools.testing" % "scalacheck_2.8.1" % "1.8" % "test"))
-    case _       =>
-     (deps :+ ("org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
-           :+ ("org.scalatest" %% "scalatest" % "2.0.M5b" % "test"))
-  }
-}
 
 
 libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _)
