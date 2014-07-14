@@ -4,9 +4,9 @@ version := "0.8.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
-crossScalaVersions  := Seq("2.11.1", "2.10.3")
+crossScalaVersions  := Seq("2.11.1", "2.10.4")
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
