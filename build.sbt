@@ -1,6 +1,6 @@
 name := "breeze-config"
 
-version := "0.8.1-SNAPSHOT"
+version := "0.9"
 
 organization := "org.scalanlp"
 
