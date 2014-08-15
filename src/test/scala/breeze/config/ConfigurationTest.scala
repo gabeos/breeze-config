@@ -1,14 +1,12 @@
 package breeze.config
 
+import java.io.File
+import java.util.Properties
+
+import breeze.config.Foo.{Rec, XParams}
+import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
-import org.junit.runner.RunWith
-
-import java.util.Properties
-import java.io.File
-import breeze.config.Foo.Rec
-import scala.reflect.runtime.universe._
-import java.lang.reflect.ParameterizedType
 
 trait ConfigurationDemoIFace {
   def int:Int
@@ -173,6 +171,17 @@ class ConfigurationTest extends FunSuite {
     assert(foo === foo2)
   }
 
+  /*
+  test("Overriding defaults is respected") {
+    val config = Configuration.fromMap(Map("str" -> 2.toString, "bo" -> true.toString))
+
+    val params = config.readIn[XParams]()
+
+    assert(params.params.str === 2)
+    assert(params.params.bo === true)
+  }
+  */
+
 }
 
 
@@ -181,4 +190,6 @@ object Foo {
 
   case class Rec(i: Int) extends ZZZ
   case class Params(str: Int, bo: Boolean, f: File , rec: ZZZ)
+
+  case class XParams(params: Params = Params(1, false, new java.io.File("aa"), new Rec(2)))
 }

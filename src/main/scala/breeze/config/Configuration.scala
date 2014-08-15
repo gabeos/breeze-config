@@ -246,7 +246,8 @@ trait Configuration { outer =>
       val defaults = lookupDefaultValues(dynamicClass, paramNames)
       val namedParams = for {((tpe, name), default) <- typedParams zip paramNames zip defaults} yield (tpe, name, default)
       val (paramValues, touched) = namedParams.map {
-        case (man, name, default) => readInTouched[Object](wrap(prefix,name), default.get)(man)
+        case (man, name, default) =>
+          readInTouched[Object](wrap(prefix,name), default.get)(man)
       }.unzip
       ctor.newInstance(paramValues: _*).asInstanceOf[T] -> touched.foldLeft(touchedProperties)(_ ++ _)
     } catch {
