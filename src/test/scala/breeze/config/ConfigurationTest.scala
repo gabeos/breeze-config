@@ -3,7 +3,7 @@ package breeze.config
 import java.io.File
 import java.util.Properties
 
-import breeze.config.Foo.{Rec, XParams}
+import breeze.config.Foo.Rec
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
