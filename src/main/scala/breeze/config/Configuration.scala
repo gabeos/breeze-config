@@ -31,7 +31,7 @@ import scala.collection.JavaConverters._
 import ReflectionUtils._
 import scala.collection.mutable
 import collection.generic.GenericCompanion
-import scala.util.Try
+import scala.util.{Success, Failure, Try}
 import Configuration._
 
 /**
@@ -73,7 +73,9 @@ import Configuration._
  * @author dlwh
  *
  */
-trait Configuration { outer =>
+trait Configuration extends ReflectionParsing with CollectionParsing with OptionParsing with EitherParsing {
+  outer =>
+
   /**
    * Get a raw property without any processing. Returns None if it's not present.
    */
@@ -94,7 +96,7 @@ trait Configuration { outer =>
    * Read in an object, boxing it if necessary.
    */
   final def readOpt[T: Manifest](prefix: String="") = {
-    try (Some(readIn[T](prefix))) catch {
+    try Some(readIn[T](prefix)) catch {
       case (e: NoParameterException) => None
     }
   }
@@ -116,8 +118,8 @@ trait Configuration { outer =>
   /**
    * Reads in an object, and return the set of property keys we touched
    */
-  final def readInTouched[T: Manifest](prefix: String): (T, Set[String]) = {
-    ArgumentParser.getArgumentParser[T] match {
+  final def readInTouched[T: Manifest: ArgParserMagnet](prefix: String): (Try[T], Set[String]) = {
+    implicitly[ArgParserMagnet[T]].apply match {
       case Some(parser) =>
          recursiveGetProperty(prefix) match {
            case Some((prop, touched)) => parser.parse(prop) -> Set(touched)
@@ -126,9 +128,11 @@ trait Configuration { outer =>
       case None =>
         val man = implicitly[Manifest[T]]
         if(isCollectionType(man))  {
-          readSequence(prefix, man, containedType(man)).asInstanceOf[(T, Set[String])]
+          readSequence(prefix).asInstanceOf[(T, Set[String])]
         } else if (isOptionType(man)) {
           readOptTouched(prefix,containedType(man)).asInstanceOf[(T,Set[String])]
+        } else if (isEitherType(man)) {
+          readEitherTouched(prefix,man.typeArguments).asInstanceOf[(T,Set[String])]
         } else {
           reflectiveReadIn[T](prefix)
         }
@@ -140,8 +144,11 @@ trait Configuration { outer =>
    * set of properties that were used.
    */
   final def readInTouched[T: Manifest](prefix: String, default: => T): (T, Set[String]) = {
-    try readInTouched[T](prefix) catch {
-      case (e: NoParameterException) => default -> Set.empty
+
+    val (t,touched) = readInTouched[T](prefix)
+    t match {
+      case Success(rt) => rt -> touched
+      case Failure(e) => default -> Set.empty[String]
     }
   }
 
@@ -150,24 +157,6 @@ trait Configuration { outer =>
     def getProperty(property: String) = outer.getProperty(property).orElse(that.getProperty(property))
 
     val allPropertyNames: Set[String] = outer.allPropertyNames ++ that.allPropertyNames
-  }
-
-  /**
-   * Determines whether or not this type is a collection type
-   * @param man the manifest to examine
-   * @return
-   */
-  private def isCollectionType(man: Manifest[_]) = {
-    man.runtimeClass.isArray || classOf[Iterable[_]].isAssignableFrom(man.runtimeClass)
-  }
-
-  /**
-   * Determines whether or not this type is an Option
-   * @param man manifest to examine
-   * @return
-   */
-  private def isOptionType(man: Manifest[_]) = {
-    classOf[Option[_]].isAssignableFrom(man.runtimeClass)
   }
 
   /**
@@ -181,105 +170,6 @@ trait Configuration { outer =>
       ReflectionUtils.manifestFromClass(comp)
     }
     else man.typeArguments.head
-  }
-
-  /**
-   * Reads in an Option
-   */
-  private def readOptTouched[T](prefix: String, contained: Manifest[T]): (Option[T],Set[String]) = {
-    try {
-      val (t,touched) = readInTouched(prefix)(contained)
-      (Some(t),touched)
-    } catch {
-      case e: NoParameterException => (None, Set.empty[String])
-    }
-  }
-
-
-  /**
-   * Reads in a sequence by looking for properties of the form prefix.0, prefix.1 etc
-   */
-  private def readSequence[T](prefix: String, container: Manifest[_], contained: Manifest[T]):(AnyRef, Set[String]) = {
-    val builder = {
-      if(container.runtimeClass.isArray)
-        mutable.ArrayBuilder.make()(contained)
-      else {
-        try {
-          // try to construct a builder by going through the companion
-          container.runtimeClass.newInstance().asInstanceOf[Iterable[T]].companion.newBuilder[T]
-        } catch {
-          case e: Exception => // hope the companion is named like we want...
-            try {
-              Class.forName(container.runtimeClass.getName + "$").getField("MODULE$").get(null).asInstanceOf[GenericCompanion[Iterable]].newBuilder[T]
-            } catch {
-              case e: Exception =>
-              throw new NoParameterException("Can't figure out what to do with a sequence of type:" + container, prefix)
-            }
-        }
-
-      }
-    }
-    var ok = true
-    var i = 0
-    var touched = Set.empty[String]
-    while(ok) {
-      try {
-        val (t, myTouched) = readInTouched(wrap(prefix,i.toString))(contained)
-        builder += t
-        touched ++= myTouched
-      } catch {
-        case e: NoParameterException => ok = false
-      }
-      i += 1
-    }
-
-     builder.result() -> touched
-  }
-
-  // We have a static type, and a dynamic type.
-  // The dynamic type will have to be inferred.
-  // Some attempts are made to deal with generics
-  private def reflectiveReadIn[T: Manifest](prefix: String): (T, Set[String]) = {
-    val staticManifest = implicitly[Manifest[T]]
-
-    val (dynamicClass: Class[_], touchedProperties) = {
-      recursiveGetProperty(prefix) match {
-        case Some((prop, propName)) =>
-          // replace each . in time with a $, for inner classes.
-          Class.forName(prop) -> Set(propName)
-        case None => staticManifest.runtimeClass -> Set.empty[String]
-      }
-    }
-    if (dynamicClass.getConstructors.isEmpty)
-      throw new NoParameterException("Could not find a constructor for type " + dynamicClass.getName, prefix)
-
-    val staticTypeVars: Seq[String] = staticManifest.runtimeClass.getTypeParameters.map(_.toString)
-    val staticTypeVals: Seq[OptManifest[_]] = staticManifest.typeArguments
-    val staticTypeMap: Map[String, OptManifest[_]] = (staticTypeVars zip staticTypeVals).toMap withDefaultValue NoManifest
-
-    val dynamicTypeMap = solveTypes(staticTypeMap, staticManifest.runtimeClass, dynamicClass)
-
-    try {
-      // pick a constructor and figure out what the parameters names are
-      val ctor = dynamicClass.getConstructors.head
-      val reader = new AdaptiveParanamer()
-      val paramNames = reader.lookupParameterNames(ctor)
-      // Also get their types
-      val typedParams = ctor.getGenericParameterTypes.map( mkManifest(dynamicTypeMap, _) )
-      // and defaults, where possible
-      val defaults = lookupDefaultValues(dynamicClass, paramNames)
-      val namedParams = for {((tpe, name), default) <- typedParams zip paramNames zip defaults} yield (tpe, name, default)
-      val (paramValues, touched) = namedParams.map {
-        case (man, name, default) =>
-          readInTouched[Object](wrap(prefix,name), default.get)(man)
-      }.unzip
-      ctor.newInstance(paramValues: _*).asInstanceOf[T] -> touched.foldLeft(touchedProperties)(_ ++ _)
-    } catch {
-      case e: ParameterNamesNotFoundException =>
-        throw new ConfigurationException("Could not find parameter names for " + dynamicClass.getName + " (" + prefix + ")") {
-          def param = prefix
-        }
-    }
   }
 
   // tries to read prefix of the form "some.value.etc" and then tries "value.etc", continuing on
@@ -307,24 +197,6 @@ trait Configuration { outer =>
   }
 
 }
-
-/** The exception thrown in case something goes wrong in Configuration
- * @author dlwh
- */
-abstract class ConfigurationException(msg: String) extends Exception(msg) {
-  def param:String
-}
-
-/** The exception thrown in case something goes wrong in Configuration
-  * @author dlwh
-  */
-class CannotParseException(param: String, msg: String) extends Exception(msg)
-
-/**
- * The exception thrown for a missing property in Configuration
- */
-class NoParameterException(msg: String, val param: String) extends ConfigurationException("while searching for " + param + ": " + msg)
-class UnusedOptionsException[T:Manifest](val param: String, val unused: Set[String]) extends ConfigurationException(s"Some parameters were not read while parsing $param of type ${implicitly[Manifest[T]]}: $unused")
 
 object Configuration {
 
@@ -429,11 +301,8 @@ object Configuration {
   }
 
   private val reader = new AdaptiveParanamer()
-  private def wrap(prefix: String, name: String):String = {
+  private[config] def wrap(prefix: String, name: String):String = {
     if(prefix.isEmpty) name
     else prefix + "." + name
   }
-
-
-
 }
