@@ -70,6 +70,13 @@ object ArgumentParser {
     def parse(arg:String) = arg.split(",").map( implicitly[ArgumentParser[T]] parse _).toSeq;
   }
 
+//  implicit def optParser[T:ArgumentParser]:ArgumentParser[Option[T]] = new ArgumentParser[Option[T]] {
+//    def parse(arg: String): Option[T] = arg.toLowerCase match {
+//      case "none" => None
+//      case _ => Some(implicitly[ArgumentParser[T]].parse(arg))
+//    }
+//  }
+
   private val argumentParsers = collection.mutable.HashMap[String,ArgumentParser[_]]()
 
   def addArgumentParser[T:ClassTag](ap: ArgumentParser[T]) = {

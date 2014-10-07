@@ -4,6 +4,7 @@ import java.io.File
 import java.util.Properties
 
 import breeze.config.Foo.Rec
+import breeze.config.CannotParseException
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
@@ -25,8 +26,45 @@ class SubDemoConfHolder[A](value: A) extends DemoConfHolder(value)
 
 case class DemoConfigurationSeq(arr: Array[Int], seq: Seq[String])
 
+
+trait EmptyConfDemoIFace
+trait SingleConfDemoIFace {
+  def v: Int
+}
+case object ConfDemoCO1 extends EmptyConfDemoIFace
+case object ConfDemoCO2 extends EmptyConfDemoIFace
+case object ConfDemoCO3 extends EmptyConfDemoIFace
+
+case class ConfDemoCC1(v: Int) extends SingleConfDemoIFace
+case class ConfDemoCC2(v: Int, v2: Int) extends SingleConfDemoIFace
+
+case class DemoConfigurationObjectSeq(seq: Seq[EmptyConfDemoIFace] = Seq.empty[EmptyConfDemoIFace])
+
+object CDOParser extends ArgumentParser[EmptyConfDemoIFace] {
+  def parse(arg: String): EmptyConfDemoIFace = arg match {
+    case "ConfDemoCO1" => ConfDemoCO1
+    case "ConfDemoCO2" => ConfDemoCO2
+    case "ConfDemoCO3" => ConfDemoCO3
+    case _ => throw new CannotParseException(arg, s"Couldn't parse $arg.")
+  }
+}
+
+object Init {
+  ArgumentParser.addArgumentParser(CDOParser)
+}
+
+case class ConfDemoArgEither(arg: Option[String])
+
 @RunWith(classOf[JUnitRunner])
 class ConfigurationTest extends FunSuite {
+
+  test("Can read either") {
+    val p = new Properties()
+    p.put("some.arg","A")
+    val reader = Configuration.fromProperties(p)
+    val me = reader.readIn[Option[String]]("some.arg")
+    assert(me == Some("A"))
+                          }
 
   test("we can read ints, doubles, booleans, and strings") {
     val p = new Properties()
@@ -171,17 +209,38 @@ class ConfigurationTest extends FunSuite {
     assert(foo === foo2)
   }
 
+
+
+  test("Case object") {
+    val i = Init
+                        val p = new Properties()
+                        p.put("seq.0", "ConfDemoCO1")
+                        p.put("seq.1", "ConfDemoCO2")
+                        p.put("seq.2", "ConfDemoCO3")
+                        val reader = Configuration.fromProperties(p)
+                        val oseq = reader.readIn[DemoConfigurationObjectSeq]()
+                        assert(oseq.seq == Seq(ConfDemoCO1, ConfDemoCO2, ConfDemoCO3))
+                      }
+
+  test("Seq subclasses") {
+                           val p = new Properties()
+                           p.put("some.v", "2")
+                           p.put("some.v2", "4")
+                           val reader = Configuration.fromProperties(p)
+                           val cseq = reader.readIn[ConfDemoCC2]("some")
+                           assert(cseq == ConfDemoCC2(2, 4))
+                         }
+
   /*
   test("Overriding defaults is respected") {
     val config = Configuration.fromMap(Map("str" -> 2.toString, "bo" -> true.toString))
 
-    val params = config.readIn[XParams]()
+    val params = config.readIn[Foo.XParams]()
 
     assert(params.params.str === 2)
     assert(params.params.bo === true)
   }
   */
-
 }
 
 

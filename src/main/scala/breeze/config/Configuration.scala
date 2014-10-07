@@ -127,6 +127,8 @@ trait Configuration { outer =>
         val man = implicitly[Manifest[T]]
         if(isCollectionType(man))  {
           readSequence(prefix, man, containedType(man)).asInstanceOf[(T, Set[String])]
+        } else if (isOptionType(man)) {
+          readOptTouched(prefix,containedType(man)).asInstanceOf[(T,Set[String])]
         } else {
           reflectiveReadIn[T](prefix)
         }
@@ -160,6 +162,15 @@ trait Configuration { outer =>
   }
 
   /**
+   * Determines whether or not this type is an Option
+   * @param man manifest to examine
+   * @return
+   */
+  private def isOptionType(man: Manifest[_]) = {
+    classOf[Option[_]].isAssignableFrom(man.runtimeClass)
+  }
+
+  /**
    * Gets the contained type from a container
    * @param man the manifest to examine
    * @return
@@ -171,6 +182,19 @@ trait Configuration { outer =>
     }
     else man.typeArguments.head
   }
+
+  /**
+   * Reads in an Option
+   */
+  private def readOptTouched[T](prefix: String, contained: Manifest[T]): (Option[T],Set[String]) = {
+    try {
+      val (t,touched) = readInTouched(prefix)(contained)
+      (Some(t),touched)
+    } catch {
+      case e: NoParameterException => (None, Set.empty[String])
+    }
+  }
+
 
   /**
    * Reads in a sequence by looking for properties of the form prefix.0, prefix.1 etc
