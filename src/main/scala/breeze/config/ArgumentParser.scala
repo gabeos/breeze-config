@@ -27,25 +27,6 @@ import scala.util.{Try, Success, Failure}
  *
  * @author dlwh
  */
-
-sealed trait ArgParserMagnet[Result] {
-  def apply(): Option[ArgumentParser[Result]]
-}
-
-object ArgParserMagnet {
-  implicit def fromArgParser[T: ArgumentParser](arg: String) = {
-    new ArgParserMagnet[T] {
-      def apply() = Some(implicitly[ArgumentParser[T]])
-    }
-  }
-
-  implicit def fromClass[T](arg: String) = {
-    new ArgParserMagnet[T] {
-      def apply() = None
-    }
-  }
-}
-
 trait ArgumentParser[T] { outer =>
   def parse(arg:String): Try[T]
   def map[U](f: T=>U): ArgumentParser[U] = new ArgumentParser[U] {
@@ -90,20 +71,20 @@ object ArgumentParser {
     def parse(arg:String): Try[Seq[T]] = Try { arg.split(",").map(argi => implicitly[ArgumentParser[T]].parse(argi).get).toSeq }
   }
 
-//  private val argumentParsers = collection.mutable.HashMap[String,ArgumentParser[_]]()
-//
-//  def addArgumentParser[T:ClassTag](ap: ArgumentParser[T]) = {
-//    argumentParsers += (implicitly[ClassTag[T]].toString -> ap)
-//  }
+  private val argumentParsers = collection.mutable.HashMap[String,ArgumentParser[_]]()
 
-//  addArgumentParser(intParser)
-//  addArgumentParser(doubleParser)
-//  addArgumentParser(booleanParser)
-//  addArgumentParser(stringParser)
-//  addArgumentParser(fileParser)
+  def addArgumentParser[T:ClassTag](ap: ArgumentParser[T]) = {
+    argumentParsers += (implicitly[ClassTag[T]].toString -> ap)
+  }
 
-//  protected[config] def getArgumentParser[T:ClassTag]:Option[ArgumentParser[T]] = {
-//    if(implicitly[ClassTag[T]].runtimeClass == classOf[Class[_]]) Some(classParser.asInstanceOf[ArgumentParser[T]])
-//    else argumentParsers.get(implicitly[ClassTag[T]].toString).asInstanceOf[Option[ArgumentParser[T]]]
-//  }
+  addArgumentParser(intParser)
+  addArgumentParser(doubleParser)
+  addArgumentParser(booleanParser)
+  addArgumentParser(stringParser)
+  addArgumentParser(fileParser)
+
+  protected[config] def getArgumentParser[T:ClassTag]:Option[ArgumentParser[T]] = {
+    if(implicitly[ClassTag[T]].runtimeClass == classOf[Class[_]]) Some(classParser.asInstanceOf[ArgumentParser[T]])
+    else argumentParsers.get(implicitly[ClassTag[T]].toString).asInstanceOf[Option[ArgumentParser[T]]]
+  }
 }

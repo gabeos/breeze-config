@@ -32,6 +32,7 @@ private[config] object ReflectionUtils {
    */
   def lookupDefaultValues(clazz: Class[_], paramNames: Seq[String]): Seq[Try[AnyRef]] = {
     try {
+      println(s"Looking up default values for class: $clazz with paramNames: $paramNames")
       val companion = Class.forName(clazz.getName() + "$").getField("MODULE$").get(null)
       // defaults have the form  init$default$X, for X = 1...
       paramNames.zipWithIndex.map { case (name, idx) =>

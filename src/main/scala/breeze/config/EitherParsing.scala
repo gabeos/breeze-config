@@ -1,7 +1,6 @@
 package breeze.config
 
-import scala.Predef.Manifest
-import scala.reflect.Manifest
+import scala.util.Try
 
 /**
  * breeze-config
@@ -22,13 +21,8 @@ trait EitherParsing {
     classOf[Either[_,_]].isAssignableFrom(man.runtimeClass)
   }
 
-  protected def readEitherTouched[T,U](prefix: String, containedLeft: Manifest[T], containedRight: Manifest[U]): (Either[T,U],Set[String]) = {
-    try {
-      val (t,touched) = readInTouched(prefix)(containedLeft)
-      (Left(t),touched)
-    } catch {
-      case
-    }
+  protected def readEitherTouched[T,U](prefix: String, containedLeft: Manifest[T], containedRight: Manifest[U]): Try[(Either[T,U],Set[String])] = {
+      readInTouched(prefix)(containedLeft).map({case (t,tt) => Left(t) -> tt}).orElse(readInTouched(prefix)(containedRight)).map({case (t,tt) => Right(t).asInstanceOf[Right[T,U]] -> tt})
   }
 
 }

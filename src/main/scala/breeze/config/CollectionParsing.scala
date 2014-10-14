@@ -27,112 +27,34 @@ trait CollectionParsing {
   /**
    * Reads in a sequence by looking for properties of the form prefix.0, prefix.1 etc
    */
-  protected def readSequence[U, T[_]](prefix: String) //, container: Manifest[T[_]], contained: Manifest[U])
-                                     (implicit cbf: CanBuildFrom[T[U], U, T[U]]): (Try[T[U]], Set[String]) = {
-    val builder = cbf()
-    //    Try {
-    //      if(container.runtimeClass.isArray)
-    //        mutable.ArrayBuilder.make()(contained)
-    //      else {
-    //        try {
-    //          // try to construct a builder by going through the companion
-    //          container.runtimeClass.newInstance().asInstanceOf[Iterable[U]].companion.newBuilder[U]
-    //        } catch {
-    //          case e: Exception => // hope the companion is named like we want...
-    //            try {
-    //              Class.forName(container.runtimeClass.getName + "$").getField("MODULE$").get(null).asInstanceOf[GenericCompanion[Iterable]].newBuilder[U]
-    //            } catch {
-    //              case e: Exception =>
-    //                throw new NoParameterException("Can't figure out what to do with a sequence of type:" + container, prefix)
-    //            }
-    //        }
-    //
-    //      }
-    //    }
-    var ok = true
-    var i = 0
-    var touched = Set.empty[String]
-    while (ok) {
-      val (t, myTouched) = readInTouched(Configuration.wrap(prefix, i.toString)) //(contained)
-      t.foreach(el => {
-        builder += el
-        touched ++= myTouched
-      })
-
-      t match {
-        case Failure(e) => e match {
-          case npe: NoParameterException => ok = false
-          case _                         => return Failure(e) -> touched
+  protected def readSequence[T](prefix: String, container: Manifest[_], contained: Manifest[T]) = {
+    val builder =
+      Try {
+        if (container.runtimeClass.isArray)
+          mutable.ArrayBuilder.make()(contained)
+        else {
+          try {
+            // try to construct a builder by going through the companion
+            container.runtimeClass.newInstance().asInstanceOf[Iterable[T]].companion.newBuilder[T]
+          } catch {
+            case e: Exception => // hope the companion is named like we want...
+              try {
+                Class.forName(container.runtimeClass.getName + "$").getField("MODULE$").get(null).asInstanceOf[GenericCompanion[Iterable]].newBuilder[T]
+              } catch {
+                case e: Exception =>
+                  throw new NoParameterException("Can't figure out what to do with a sequence of type:" + container, prefix)
+              }
+          }
         }
-        case _          => Unit
       }
-
-      i += 1
-    }
-
-    Success(builder.result()) -> touched
+    builder.map(bldr => {
+      var touched = Set.empty[String]
+      Stream.from(0).map(i => {
+        readInTouched(Configuration.wrap(prefix, i.toString))(contained)
+      }).takeWhile(_.isSuccess).map(_.get)
+      .foreach({ case (el,t) => bldr += el; touched ++= t })
+      bldr.result() -> touched
+    })
   }
 }
 
-trait ContainerParserMagnet[U, T[_]] {
-  def apply(): (Try[T[U]], Set[String])
-}
-
-object ContainerParserMagnet {
-  implicit def readSimpleCollection[U, T[_]](prefix: String)(implicit argp: ArgumentParser[U], cbf: CanBuildFrom[T[U], U, T[U]]) =
-    new ContainerParserMagnet[U, T[U]] {
-      def apply(): (Try[T[U]], Set[String]) = {
-        val builder = cbf()
-
-        var ok = true
-        var i = 0
-        var touched = Set.empty[String]
-        while (ok) {
-          val cfgKey = Configuration.wrap(prefix, i.toString)
-          argp.parse(cfgKey) match {
-            case Success(el) =>
-              builder += el
-              touched ++= cfgKey
-            case Failure(e)  => e match {
-              case npe: NoParameterException => ok = false
-              case _                         => return Failure(e) -> touched
-            }
-          }
-          i += 1
-        }
-        Success(builder.result()) -> touched
-      }
-    }
-
-  implicit def readCollection[U,T[_]](prefix: String)(implicit argm: ArgParserMagnet, cbf: CanBuildFrom[T[U],U,T[U]]) =
-    new ContainerParserMagnet[U,T[U]] {
-      def apply(): (Try[T[U]], Set[String]) = {
-        val builder = cbf()
-
-        var ok = true
-        var i = 0
-        var touched = Set.empty[String]
-        while (ok) {
-          val cfgKey = Configuration.wrap(prefix, i.toString)
-          argm() match {
-            case Some(argp) => argp.parse(cfgKey)
-            case None =>
-          }
-
-
-
-          match {
-            case Success(el) =>
-              builder += el
-              touched ++= cfgKey
-            case Failure(e)  => e match {
-              case npe: NoParameterException => ok = false
-              case _                         => return Failure(e) -> touched
-            }
-          }
-          i += 1
-        }
-        Success(builder.result()) -> touched
-      }
-    }
-}

@@ -1,8 +1,5 @@
 package breeze.config
 
-import scala.Predef.Manifest
-import scala.reflect.Manifest
-
 /**
  * breeze-config
  * 10/6/14

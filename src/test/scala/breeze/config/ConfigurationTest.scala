@@ -24,7 +24,7 @@ trait ConfDemoHolderIFace[A] {
 case class DemoConfHolder[A](value: A) extends ConfDemoHolderIFace[A]
 class SubDemoConfHolder[A](value: A) extends DemoConfHolder(value)
 
-case class DemoConfigurationSeq(arr: Array[Int], seq: Seq[String])
+case class DemoConfigurationSeq(arr: Array[Int] = Array(0), seq: Seq[String] = Seq("A"))
 
 
 trait EmptyConfDemoIFace
@@ -40,18 +40,18 @@ case class ConfDemoCC2(v: Int, v2: Int) extends SingleConfDemoIFace
 
 case class DemoConfigurationObjectSeq(seq: Seq[EmptyConfDemoIFace] = Seq.empty[EmptyConfDemoIFace])
 
-object CDOParser extends ArgumentParser[EmptyConfDemoIFace] {
-  def parse(arg: String): EmptyConfDemoIFace = arg match {
-    case "ConfDemoCO1" => ConfDemoCO1
-    case "ConfDemoCO2" => ConfDemoCO2
-    case "ConfDemoCO3" => ConfDemoCO3
-    case _ => throw new CannotParseException(arg, s"Couldn't parse $arg.")
-  }
-}
-
-object Init {
-  ArgumentParser.addArgumentParser(CDOParser)
-}
+//object CDOParser extends ArgumentParser[EmptyConfDemoIFace] {
+//  def parse(arg: String): EmptyConfDemoIFace = arg match {
+//    case "ConfDemoCO1" => ConfDemoCO1
+//    case "ConfDemoCO2" => ConfDemoCO2
+//    case "ConfDemoCO3" => ConfDemoCO3
+//    case _ => throw new CannotParseException(arg, s"Couldn't parse $arg.")
+//  }
+//}
+//
+//object Init {
+//  ArgumentParser.addArgumentParser(CDOParser)
+//}
 
 case class ConfDemoArgEither(arg: Option[String])
 
@@ -179,7 +179,7 @@ class ConfigurationTest extends FunSuite {
     p.put("seq.2","bar")
     p.put("seq.4","baz") // skips this because 3 isn't present
     val reader = Configuration.fromProperties(p)
-    val my = reader.readIn[DemoConfigurationSeq]("some")
+    val my = reader.readIn[DemoConfigurationSeq]()
     assert(my.seq.toList === List("test","foo","bar"))
     assert(my.arr.toList === List(1,2,3))
   }
@@ -209,18 +209,18 @@ class ConfigurationTest extends FunSuite {
     assert(foo === foo2)
   }
 
-
-
-  test("Case object") {
-    val i = Init
-                        val p = new Properties()
-                        p.put("seq.0", "ConfDemoCO1")
-                        p.put("seq.1", "ConfDemoCO2")
-                        p.put("seq.2", "ConfDemoCO3")
-                        val reader = Configuration.fromProperties(p)
-                        val oseq = reader.readIn[DemoConfigurationObjectSeq]()
-                        assert(oseq.seq == Seq(ConfDemoCO1, ConfDemoCO2, ConfDemoCO3))
-                      }
+//
+//
+//  test("Case object") {
+//    val i = Init
+//                        val p = new Properties()
+//                        p.put("seq.0", "ConfDemoCO1")
+//                        p.put("seq.1", "ConfDemoCO2")
+//                        p.put("seq.2", "ConfDemoCO3")
+//                        val reader = Configuration.fromProperties(p)
+//                        val oseq = reader.readIn[DemoConfigurationObjectSeq]()
+//                        assert(oseq.seq == Seq(ConfDemoCO1, ConfDemoCO2, ConfDemoCO3))
+//                      }
 
   test("Seq subclasses") {
                            val p = new Properties()

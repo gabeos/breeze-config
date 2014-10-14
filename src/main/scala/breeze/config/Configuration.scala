@@ -105,7 +105,7 @@ trait Configuration extends ReflectionParsing with CollectionParsing with Option
    * Reads in an object, but throw an exception if not found.
    */
   final def readIn[T: Manifest](prefix: String="", enforceFullCoverage: Boolean = false): T = {
-    val (t, touched) = readInTouched(prefix)
+    val (t, touched) = readInTouched(prefix).get
     if(enforceFullCoverage) {
       val remaining = allPropertyNames -- touched
       if(remaining.nonEmpty) throw new UnusedOptionsException[T](prefix, remaining)
@@ -118,21 +118,22 @@ trait Configuration extends ReflectionParsing with CollectionParsing with Option
   /**
    * Reads in an object, and return the set of property keys we touched
    */
-  final def readInTouched[T: Manifest: ArgParserMagnet](prefix: String): (Try[T], Set[String]) = {
-    implicitly[ArgParserMagnet[T]].apply match {
+  final def readInTouched[T: Manifest](prefix: String): Try[(T, Set[String])] = {
+    ArgumentParser.getArgumentParser[T] match {
       case Some(parser) =>
          recursiveGetProperty(prefix) match {
-           case Some((prop, touched)) => parser.parse(prop) -> Set(touched)
-           case None => throw new NoParameterException("Could not find matching property for " + prefix, prefix)
+           case Some((prop, touched)) => parser.parse(prop).map(_ -> Set(touched))
+           case None => Failure(new NoParameterException("Could not find matching property for " + prefix, prefix))
          }
       case None =>
         val man = implicitly[Manifest[T]]
         if(isCollectionType(man))  {
-          readSequence(prefix).asInstanceOf[(T, Set[String])]
+          readSequence(prefix,man,containedType(man)).asInstanceOf[Try[(T,Set[String])]]
         } else if (isOptionType(man)) {
-          readOptTouched(prefix,containedType(man)).asInstanceOf[(T,Set[String])]
+          readOptTouched(prefix,containedType(man)).asInstanceOf[Try[(T,Set[String])]]
         } else if (isEitherType(man)) {
-          readEitherTouched(prefix,man.typeArguments).asInstanceOf[(T,Set[String])]
+          val left :: right = man.typeArguments
+          readEitherTouched(prefix,left,right.head).asInstanceOf[Try[(T,Set[String])]]
         } else {
           reflectiveReadIn[T](prefix)
         }
@@ -144,12 +145,8 @@ trait Configuration extends ReflectionParsing with CollectionParsing with Option
    * set of properties that were used.
    */
   final def readInTouched[T: Manifest](prefix: String, default: => T): (T, Set[String]) = {
-
-    val (t,touched) = readInTouched[T](prefix)
-    t match {
-      case Success(rt) => rt -> touched
-      case Failure(e) => default -> Set.empty[String]
-    }
+    val rit = readInTouched[T](prefix)
+    rit.getOrElse(default -> Set.empty)
   }
 
   /** Use properties from that if not found in this */

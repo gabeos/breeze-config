@@ -1,6 +1,7 @@
 package breeze.config
 
 import scala.reflect.Manifest
+import scala.util.Try
 
 /**
  * breeze-config
@@ -24,12 +25,7 @@ trait OptionParsing {
   /**
    * Reads in an Option
    */
-  protected def readOptTouched[T](prefix: String, contained: Manifest[T]): (Option[T],Set[String]) = {
-    try {
-      val (t,touched) = readInTouched(prefix)(contained)
-      (Some(t),touched)
-    } catch {
-      case e: NoParameterException => (None, Set.empty[String])
-    }
+  protected def readOptTouched[T](prefix: String, contained: Manifest[T]): Try[(Option[T],Set[String])] = {
+      readInTouched(prefix)(contained) map { case (tt,touched) => Some(tt) -> touched }
   }
 }
